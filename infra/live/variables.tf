@@ -38,4 +38,8 @@ variable "github_repo" {
   type        = string
   default     = null
   description = "Your lab repo as owner/name. The notebook (S2) clones it; the repo is public."
+  validation {
+    condition     = var.github_repo == null ? true : can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$", var.github_repo))
+    error_message = "github_repo must be a GitHub owner/repository name."
+  }
 }

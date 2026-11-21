@@ -11,7 +11,7 @@ from ..resources import DataBucket
 ingest_month = dg.define_asset_job(
     "ingest_month",
     selection=dg.AssetSelection.assets(
-        "taxi_zones", "trip_files", "raw_trips", "stg_trips", "mart_ready_trips", "zone_hour_stats",
+        "taxi_zones", "trip_files", "raw_trips", "stg_trips", "mart_ready_trips", "zone_hour_stats", "trip_features",
     ),
 )
 

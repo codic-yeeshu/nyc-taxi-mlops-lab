@@ -28,6 +28,9 @@ concurrency:
       - key: dagster/partition
         value: {applyLimitPerUniqueValue: true}
         limit: 1
+      - key: lab/training
+        value: model
+        limit: 1
   # Assets that write to Redshift share pool "redshift", one step at a time: concurrent deletes and
   # inserts on one table abort with serializable isolation errors.
   pools:

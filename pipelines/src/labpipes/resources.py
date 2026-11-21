@@ -151,7 +151,7 @@ def read_footer(source) -> Footer:
     """Columns (Parquet storage types, as in contracts/trips.schema.yaml) and row count of a Parquet file."""
     pf = pq.ParquetFile(source)
     schema = pf.schema
-    cols = [Column(schema.column(i).name, parquet_type(schema.column(i))) for i in range(len(schema))]
+    cols = [Column(col.path, parquet_type(col)) for col in map(schema.column, range(len(schema)))]
     return Footer(cols, pf.metadata.num_rows)
 
 

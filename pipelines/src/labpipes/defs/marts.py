@@ -1,4 +1,4 @@
-"""zone_hour_stats: trip counts and duration percentiles per pickup zone and hour, over every month.
+"""zone_hour_stats: trip counts and duration percentiles per pickup zone and hour over approved months.
 
 It's unpartitioned and rebuilt in full; include it in the ingest run so a month that fails a blocking
 check upstream never reaches the mart. The table's DDL is the frozen contract in contracts/marts.sql.
@@ -11,7 +11,7 @@ from ..resources import RedshiftData
 from ..sql import statements
 
 
-@dg.asset(deps=["stg_trips", "taxi_zones"], group_name="marts", kinds={"redshift"}, pool="redshift")
+@dg.asset(deps=["mart_ready_trips", "taxi_zones"], group_name="marts", kinds={"redshift"}, pool="redshift")
 def zone_hour_stats(redshift: RedshiftData) -> dg.MaterializeResult:
     redshift.execute("create schema if not exists marts", *marts_ddl(), *statements("zone_hour_stats"))
     s = redshift.query(

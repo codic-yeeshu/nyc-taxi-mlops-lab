@@ -23,6 +23,11 @@ concurrency:
   # Two runs at a time keeps the t4g.large's 8 GB safe once S2 trains LightGBM in a run.
   runs:
     max_concurrent_runs: 2
+    # Keep one run per month so its staging rows stay stable between checking and publishing.
+    tag_concurrency_limits:
+      - key: dagster/partition
+        value: {applyLimitPerUniqueValue: true}
+        limit: 1
   # Assets that write to Redshift share pool "redshift", one step at a time: concurrent deletes and
   # inserts on one table abort with serializable isolation errors.
   pools:

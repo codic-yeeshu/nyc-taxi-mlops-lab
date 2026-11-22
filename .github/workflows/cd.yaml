@@ -32,6 +32,7 @@ jobs:
       sha: ${{ steps.staged.outputs.sha }}
     env:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      LLM_HOST: ${{ vars.LLM_HOST }}
     steps:
       - name: Check that the commit is still current
         id: commit

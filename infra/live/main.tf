@@ -57,3 +57,9 @@ module "grafana" {
   name        = "lab/grafana"
   description = "Grafana Cloud Prometheus remote-write endpoint and access policy credentials"
 }
+
+module "langfuse" {
+  source      = "../modules/secret"
+  name        = "lab/langfuse"
+  description = "Langfuse project endpoint and API credentials"
+}

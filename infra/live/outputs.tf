@@ -18,6 +18,10 @@ output "llm_instance_id" {
   value = module.host["llm"].instance_id
 }
 
+output "llm_private_ip" {
+  value = module.host["llm"].private_ip
+}
+
 output "rds_endpoint" {
   value = module.rds.endpoint
 }

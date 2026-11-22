@@ -459,7 +459,7 @@
     {
       "id": 13,
       "type": "row",
-      "title": "SLOs (S5: yours to build)",
+      "title": "Service level objectives",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -471,18 +471,384 @@
     },
     {
       "id": 14,
-      "type": "text",
-      "title": "Build these",
+      "type": "timeseries",
+      "title": "Public HTTP availability (99%)",
+      "description": "Share of responses on Traefik's public web entrypoint without HTTP 5xx. The rolling 30-day objective and recent 1-hour performance are on the left axis. Fast burn windows are on the right.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "gridPos": {
         "x": 0,
         "y": 44,
         "w": 24,
-        "h": 5
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "axisPlacement": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Burn rate|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:×"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Objective|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    6
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "mode": "markdown",
-        "content": "One panel per SLO in `observability/slo.yaml`, from the recording rules in `observability/rules/`:\n\n- the SLI over the last hour against its objective\n- the burn rate (1 h and 5 min), with the alert threshold drawn on it\n\nSave the dashboard, export its JSON over this file, and commit it."
-      }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"availability\",window=\"1h\"}",
+          "legendFormat": "SLI (1h)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"availability\",window=\"30d\"}",
+          "legendFormat": "SLI (30d)"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_error_budget_ratio{slo=\"availability\"}",
+          "legendFormat": "Objective"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"availability\",window=\"5m\"}",
+          "legendFormat": "Burn rate (5m)"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"availability\",window=\"1h\"}",
+          "legendFormat": "Burn rate (1h)"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(14.4)",
+          "legendFormat": "Paging threshold (fast)"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Prediction latency ≤ 500 ms (95%)",
+      "description": "Share of POST /predict responses at or below 500 ms inside the app. The rolling 30-day objective and recent 1-hour performance are on the left axis. Fast burn windows are on the right.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "axisPlacement": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Burn rate|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:×"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Objective|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    6
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"latency\",window=\"1h\"}",
+          "legendFormat": "SLI (1h)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"latency\",window=\"30d\"}",
+          "legendFormat": "SLI (30d)"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_error_budget_ratio{slo=\"latency\"}",
+          "legendFormat": "Objective"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"latency\",window=\"5m\"}",
+          "legendFormat": "Burn rate (5m)"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"latency\",window=\"1h\"}",
+          "legendFormat": "Burn rate (1h)"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(14.4)",
+          "legendFormat": "Paging threshold (fast)"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Model-backed quotes (99%)",
+      "description": "Share of issued quotes produced by model serving. The rolling 30-day objective and recent 1-hour performance are on the left axis. Fast burn windows are on the right.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "custom": {
+            "axisPlacement": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Burn rate|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:×"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^(Objective|Paging threshold)/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    6
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"model-backed\",window=\"1h\"}",
+          "legendFormat": "SLI (1h)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_bad_ratio{slo=\"model-backed\",window=\"30d\"}",
+          "legendFormat": "SLI (30d)"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 - lab_slo_error_budget_ratio{slo=\"model-backed\"}",
+          "legendFormat": "Objective"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"model-backed\",window=\"5m\"}",
+          "legendFormat": "Burn rate (5m)"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "lab_slo_burn_rate{slo=\"model-backed\",window=\"1h\"}",
+          "legendFormat": "Burn rate (1h)"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(14.4)",
+          "legendFormat": "Paging threshold (fast)"
+        }
+      ]
     }
   ],
   "annotations": {

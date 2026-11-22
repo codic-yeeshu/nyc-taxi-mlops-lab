@@ -1,0 +1,100 @@
+rule_files:
+  - slo.rules.yaml
+evaluation_interval: 1m
+tests:
+  - name: Sustained breach pages for each rider SLO
+    interval: 1m
+    input_series:
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="200"}'
+        values: '0+100x120 12000+0x300'
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="503"}'
+        values: '0+0x120 100+100x300'
+      - series: 'lab_http_request_duration_seconds_count{route="/predict",method="POST"}'
+        values: '0+100x421'
+      - series: 'lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}'
+        values: '0+100x120 12000+0x300'
+      - series: 'lab_predictions_total{source="model",alias="champion",version="1"}'
+        values: '0+100x120 12000+0x300'
+      - series: 'lab_predictions_total{source="fallback"}'
+        values: '0+0x120 100+100x300'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: RideSLOFastBurn
+        exp_alerts:
+          - exp_labels: {slo: availability, window: 5m, severity: page}
+            exp_annotations: {summary: "Ride app availability SLO burn exceeds 14.4x"}
+          - exp_labels: {slo: latency, window: 5m, severity: page}
+            exp_annotations: {summary: "Ride app latency SLO burn exceeds 14.4x"}
+          - exp_labels: {slo: model-backed, window: 5m, severity: page}
+            exp_annotations: {summary: "Ride app model-backed SLO burn exceeds 14.4x"}
+      - eval_time: 3h
+        alertname: RideSLOSlowBurn
+        exp_alerts:
+          - exp_labels: {slo: availability, window: 30m, severity: page}
+            exp_annotations: {summary: "Ride app availability SLO burn exceeds 6x"}
+          - exp_labels: {slo: latency, window: 30m, severity: page}
+            exp_annotations: {summary: "Ride app latency SLO burn exceeds 6x"}
+          - exp_labels: {slo: model-backed, window: 30m, severity: page}
+            exp_annotations: {summary: "Ride app model-backed SLO burn exceeds 6x"}
+  - name: One minute of bad responses does not page
+    interval: 1m
+    input_series:
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="200"}'
+        values: '0+100x120 12000+100x60'
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="503"}'
+        values: '0+0x120 100+0x60'
+      - series: 'lab_http_request_duration_seconds_count{route="/predict",method="POST"}'
+        values: '0+100x181'
+      - series: 'lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}'
+        values: '0+100x120 12000+100x60'
+      - series: 'lab_predictions_total{source="model",alias="champion",version="1"}'
+        values: '0+100x120 12000+100x60'
+      - series: 'lab_predictions_total{source="fallback"}'
+        values: '0+0x120 100+0x60'
+    alert_rule_test:
+      - eval_time: 2h1m
+        alertname: RideSLOFastBurn
+        exp_alerts: []
+      - eval_time: 2h1m
+        alertname: RideSLOSlowBurn
+        exp_alerts: []
+  - name: Healthy traffic can have no failure series
+    interval: 1m
+    input_series:
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="200"}'
+        values: '0+100x15'
+      - series: 'lab_http_request_duration_seconds_count{route="/predict",method="POST"}'
+        values: '0+100x15'
+      - series: 'lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}'
+        values: '0+100x15'
+      - series: 'lab_predictions_total{source="model",alias="champion",version="1"}'
+        values: '0+100x15'
+    promql_expr_test:
+      - expr: 'lab_slo_bad_ratio{window="5m"}'
+        eval_time: 15m
+        exp_samples:
+          - labels: 'lab_slo_bad_ratio{slo="availability",window="5m"}'
+            value: 0
+          - labels: 'lab_slo_bad_ratio{slo="latency",window="5m"}'
+            value: 0
+          - labels: 'lab_slo_bad_ratio{slo="model-backed",window="5m"}'
+            value: 0
+  - name: No traffic leaves the SLI undefined
+    interval: 1m
+    input_series:
+      - series: 'traefik_entrypoint_requests_total{entrypoint="web",code="200"}'
+        values: '0+0x15'
+      - series: 'lab_http_request_duration_seconds_count{route="/predict",method="POST"}'
+        values: '0+0x15'
+      - series: 'lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}'
+        values: '0+0x15'
+      - series: 'lab_predictions_total{source="model",alias="champion",version="1"}'
+        values: '0+0x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: RideSLOFastBurn
+        exp_alerts: []
+    promql_expr_test:
+      - expr: 'lab_slo_bad_ratio{window="5m"}'
+        eval_time: 15m
+        exp_samples: []

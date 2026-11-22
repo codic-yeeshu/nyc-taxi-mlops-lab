@@ -51,3 +51,9 @@ module "wiki" {
   name        = "lab/wiki"
   description = "URL and token for the lab wiki"
 }
+
+module "grafana" {
+  source      = "../modules/secret"
+  name        = "lab/grafana"
+  description = "Grafana Cloud Prometheus remote-write endpoint and access policy credentials"
+}

@@ -1,5 +1,118 @@
-# SLO recording and alerting rules (S5, decision 013), evaluated by your Grafana Cloud stack's ruler.
-# Prometheus rule format: https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
-# Metric names are contracts/metrics.yaml's. `make check` runs promtool on this file and on any
-# *.test.yaml next to it.
-groups: []
+# Evaluate the two paging windows together. An idle window produces no bad ratio.
+groups:
+  - name: ride-slo-burn
+    interval: 1m
+    rules:
+      - record: lab_slo_error_budget_ratio
+        labels: {slo: availability}
+        expr: vector(0.01)
+      - record: lab_slo_error_budget_ratio
+        labels: {slo: latency}
+        expr: vector(0.05)
+      - record: lab_slo_error_budget_ratio
+        labels: {slo: model-backed}
+        expr: vector(0.01)
+      - record: lab_slo_bad_ratio
+        labels: {slo: availability, window: 5m}
+        expr: |
+          (sum(rate(traefik_entrypoint_requests_total{entrypoint="web",code=~"5.."}[5m])) or on() (0 * sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[5m]))))
+          / (sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[5m])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: latency, window: 5m}
+        expr: |
+          1 - (
+            (sum(rate(lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}[5m])) or on() (0 * sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[5m]))))
+            / (sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[5m])) > 0)
+          )
+      - record: lab_slo_bad_ratio
+        labels: {slo: model-backed, window: 5m}
+        expr: |
+          (sum(rate(lab_predictions_total{source="fallback"}[5m])) or on() (0 * sum(rate(lab_predictions_total{source=~"model|fallback"}[5m]))))
+          / (sum(rate(lab_predictions_total{source=~"model|fallback"}[5m])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: availability, window: 1h}
+        expr: |
+          (sum(rate(traefik_entrypoint_requests_total{entrypoint="web",code=~"5.."}[1h])) or on() (0 * sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[1h]))))
+          / (sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[1h])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: latency, window: 1h}
+        expr: |
+          1 - (
+            (sum(rate(lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}[1h])) or on() (0 * sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[1h]))))
+            / (sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[1h])) > 0)
+          )
+      - record: lab_slo_bad_ratio
+        labels: {slo: model-backed, window: 1h}
+        expr: |
+          (sum(rate(lab_predictions_total{source="fallback"}[1h])) or on() (0 * sum(rate(lab_predictions_total{source=~"model|fallback"}[1h]))))
+          / (sum(rate(lab_predictions_total{source=~"model|fallback"}[1h])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: availability, window: 30m}
+        expr: |
+          (sum(rate(traefik_entrypoint_requests_total{entrypoint="web",code=~"5.."}[30m])) or on() (0 * sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[30m]))))
+          / (sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[30m])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: latency, window: 30m}
+        expr: |
+          1 - (
+            (sum(rate(lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}[30m])) or on() (0 * sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[30m]))))
+            / (sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[30m])) > 0)
+          )
+      - record: lab_slo_bad_ratio
+        labels: {slo: model-backed, window: 30m}
+        expr: |
+          (sum(rate(lab_predictions_total{source="fallback"}[30m])) or on() (0 * sum(rate(lab_predictions_total{source=~"model|fallback"}[30m]))))
+          / (sum(rate(lab_predictions_total{source=~"model|fallback"}[30m])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: availability, window: 6h}
+        expr: |
+          (sum(rate(traefik_entrypoint_requests_total{entrypoint="web",code=~"5.."}[6h])) or on() (0 * sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[6h]))))
+          / (sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[6h])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: latency, window: 6h}
+        expr: |
+          1 - (
+            (sum(rate(lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}[6h])) or on() (0 * sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[6h]))))
+            / (sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[6h])) > 0)
+          )
+      - record: lab_slo_bad_ratio
+        labels: {slo: model-backed, window: 6h}
+        expr: |
+          (sum(rate(lab_predictions_total{source="fallback"}[6h])) or on() (0 * sum(rate(lab_predictions_total{source=~"model|fallback"}[6h]))))
+          / (sum(rate(lab_predictions_total{source=~"model|fallback"}[6h])) > 0)
+      - record: lab_slo_burn_rate
+        expr: lab_slo_bad_ratio / on (slo) group_left lab_slo_error_budget_ratio
+      - alert: RideSLOFastBurn
+        expr: |
+          lab_slo_burn_rate{window="5m"} > 14.4
+          and on (slo) lab_slo_burn_rate{window="1h"} > 14.4
+        labels: {severity: page}
+        annotations:
+          summary: "Ride app {{ $labels.slo }} SLO burn exceeds 14.4x"
+      - alert: RideSLOSlowBurn
+        expr: |
+          lab_slo_burn_rate{window="30m"} > 6
+          and on (slo) lab_slo_burn_rate{window="6h"} > 6
+        labels: {severity: page}
+        annotations:
+          summary: "Ride app {{ $labels.slo }} SLO burn exceeds 6x"
+  - name: ride-slo-objectives
+    interval: 5m
+    rules:
+      - record: lab_slo_bad_ratio
+        labels: {slo: availability, window: 30d}
+        expr: |
+          (sum(rate(traefik_entrypoint_requests_total{entrypoint="web",code=~"5.."}[30d])) or on() (0 * sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[30d]))))
+          / (sum(rate(traefik_entrypoint_requests_total{entrypoint="web"}[30d])) > 0)
+      - record: lab_slo_bad_ratio
+        labels: {slo: latency, window: 30d}
+        expr: |
+          1 - (
+            (sum(rate(lab_http_request_duration_seconds_bucket{route="/predict",method="POST",le="0.5"}[30d])) or on() (0 * sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[30d]))))
+            / (sum(rate(lab_http_request_duration_seconds_count{route="/predict",method="POST"}[30d])) > 0)
+          )
+      - record: lab_slo_bad_ratio
+        labels: {slo: model-backed, window: 30d}
+        expr: |
+          (sum(rate(lab_predictions_total{source="fallback"}[30d])) or on() (0 * sum(rate(lab_predictions_total{source=~"model|fallback"}[30d]))))
+          / (sum(rate(lab_predictions_total{source=~"model|fallback"}[30d])) > 0)

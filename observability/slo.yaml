@@ -1,9 +1,17 @@
-# Service level objectives for the ride app (S5, decision 013). rules/slo.rules.yaml computes them.
-# One entry per SLO: what's measured (the SLI, from contracts/metrics.yaml), the objective, why that
-# number, and the alert that tells you it's being missed.
+# The ratios measure observed traffic over a rolling 30 days.
 slos:
-  - name: predict-availability
-    sli:
-    objective:
-    why:
-    alert:
+  - name: availability
+    sli: Share of responses on Traefik's public web entrypoint without HTTP 5xx.
+    objective: 99%
+    why: Counts failures at the public entrypoint, including those produced by the proxy. The target leaves an error budget for blue-green deploys and lab restarts.
+    alert: [RideSLOFastBurn, RideSLOSlowBurn]
+  - name: latency
+    sli: Share of POST /predict responses at or below 500 ms inside the app.
+    objective: 95%
+    why: 500 ms is a histogram bucket boundary and gives the normal quote path room for the serving timeout and app processing.
+    alert: [RideSLOFastBurn, RideSLOSlowBurn]
+  - name: model-backed
+    sli: Share of issued quotes produced by model serving.
+    objective: 99%
+    why: A fallback can return HTTP 200, so it needs its own target. A small budget allows brief serving transitions.
+    alert: [RideSLOFastBurn, RideSLOSlowBurn]

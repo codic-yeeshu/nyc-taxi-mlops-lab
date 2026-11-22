@@ -1,9 +1,9 @@
 # Pipeline status for the grader (given in S1): every 20 minutes the platform host's runner asks the
 # local Dagster webserver what's loaded and what the checks say, and uploads it as an artifact. The
 # grader can't reach your Dagster (no ingress), so this is how the scoreboard sees your pipeline.
-# Read-only, and off until LAB_PLATFORM=on. While the hosts are stopped, runs wait for the runner; the
-# concurrency group keeps only the newest one waiting. After Start Lab the runner is up before Dagster,
-# so the query retries for up to five minutes.
+# The probes only read the lab. The GitHub-hosted guard cancels this run if an enabled lab job
+# doesn't reach a runner within five minutes. After Start Lab the runner is up before Dagster, so
+# the query still retries for up to five minutes once its job starts.
 name: status
 
 on:
@@ -19,6 +19,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runner-queue-guard:
+    if: vars.LAB_PLATFORM == 'on' || vars.LAB_SERVING == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LAB_PLATFORM: ${{ vars.LAB_PLATFORM }}
+      LAB_SERVING: ${{ vars.LAB_SERVING }}
+    steps:
+      - name: Limit the wait for AWS runners
+        shell: bash
+        run: |
+          run="/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          jobs="$run/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100"
+          deadline=$((SECONDS + 300))
+          while :; do
+            if waiting=$(timeout 10s gh api "$jobs" | jq -er \
+              --arg platform "$LAB_PLATFORM" --arg serving "$LAB_SERVING" '
+                ([if $platform == "on" then "status" else empty end,
+                  if $serving == "on" then "app-host" else empty end]
+                 - [.jobs[] | select(.status == "in_progress" or .status == "completed") | .name])
+                | join(", ")'); then
+              if [[ -z "$waiting" ]]; then
+                echo "All enabled lab jobs have started or completed."
+                exit 0
+              fi
+              reason="Still waiting for a runner: $waiting"
+            else
+              reason="Could not confirm runner pickup through the GitHub API"
+            fi
+            if (( SECONDS >= deadline )); then
+              echo "::warning::$reason after five minutes. Cancelling this status run."
+              timeout 15s gh api --method POST "$run/cancel"
+              exit 0
+            fi
+            sleep 15
+          done
+
   status:
     if: vars.LAB_PLATFORM == 'on'
     runs-on: [self-hosted, lab-platform]

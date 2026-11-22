@@ -1,0 +1,98 @@
+name: Promote model
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Gated model version to promote (blank selects the current challenger)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  evaluate:
+    if: github.ref == 'refs/heads/main' && vars.LAB_SERVING == 'on'
+    runs-on: [self-hosted, lab-app]
+    timeout-minutes: 5
+    outputs:
+      target: ${{ steps.plan.outputs.target }}
+      previous: ${{ steps.plan.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve the exact gated version for review
+        id: plan
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          plan=$(docker exec -i lab-serving-serving-challenger-1 python - resolve "$REQUESTED_VERSION" '' < deploy/model-promotion.py)
+          target=$(jq -er '.target' <<<"$plan")
+          previous=$(jq -er '.previous' <<<"$plan")
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          {
+            printf '### Model promotion approval\n\nVersion `%s` would replace `%s`.\n\n' "$target" "${previous:-no champion}"
+            jq -r '.metrics | to_entries[] | "- \(.key): \(.value)"' <<<"$plan"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    needs: evaluate
+    if: github.ref == 'refs/heads/main' && needs.evaluate.outputs.target != ''
+    environment: production
+    runs-on: [self-hosted, lab-app]
+    concurrency:
+      group: deploy-app
+      cancel-in-progress: false
+    timeout-minutes: 10
+    env:
+      TARGET: ${{ needs.evaluate.outputs.target }}
+      PREVIOUS: ${{ needs.evaluate.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Promote, hot-reload and verify the public route
+        run: |
+          registry() {
+            docker exec -i lab-serving-serving-challenger-1 python - "$1" "$TARGET" "$PREVIOUS" < deploy/model-promotion.py
+          }
+
+          check_prediction() {
+            local expected=$1 response
+            for _ in {1..18}; do
+              if response=$(curl -fsS --max-time 5 http://127.0.0.1/predict -H 'Content-Type: application/json' \
+                -d '{"pickup_zone_id":132,"dropoff_zone_id":230,"pickup_datetime":"2024-03-08T17:05:00"}' 2>/dev/null) &&
+                jq -e --arg expected "$expected" '.duration_minutes > 0 and .model.alias == "champion" and .model.version == $expected' \
+                  <<<"$response" >/dev/null; then
+                echo "$response"
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+
+          printf 'Outgoing champion: `%s`\n\n' "${PREVIOUS:-none}" >> "$GITHUB_STEP_SUMMARY"
+          registry promote
+          if deploy/web.sh reload champion | jq -e --arg target "$TARGET" '.alias == "champion" and .version == $target' &&
+             check_prediction "$TARGET"; then
+            printf 'Verified champion `%s` through the rider-facing app.\n' "$TARGET" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "Promotion verification failed. Restoring the pre-promotion state." >&2
+          registry restore
+          if [[ -n "$PREVIOUS" ]]; then
+            deploy/web.sh reload champion
+            check_prediction "$PREVIOUS"
+          else
+            docker restart lab-serving-serving-champion-1
+          fi
+          exit 1

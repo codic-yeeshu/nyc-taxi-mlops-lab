@@ -15,8 +15,9 @@ defaults:
     shell: bash
 
 jobs:
-  deploy:
+  stage:
     if: >-
+      vars.LAB_SERVING == 'on' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
@@ -26,6 +27,9 @@ jobs:
       group: deploy-app
       cancel-in-progress: false
     timeout-minutes: 10
+    outputs:
+      colour: ${{ steps.staged.outputs.colour }}
+      sha: ${{ steps.staged.outputs.sha }}
     env:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
@@ -52,22 +56,53 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Deploy app and Traefik
+      - name: Stage and smoke-test the idle colour
+        id: staged
         if: steps.commit.outputs.current == 'true'
         run: |
           export IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
-          export IMAGE_TAG="$DEPLOY_SHA"
-          docker compose -f deploy/compose.app.yaml pull
-          docker compose -f deploy/compose.app.yaml up -d --wait --wait-timeout 120
-      - name: Smoke-test the deployed commit
-        if: steps.commit.outputs.current == 'true'
+          live=$(deploy/web.sh live)
+          if [[ "$live" != none ]] && [[ "$(deploy/web.sh tag "$live")" == "$DEPLOY_SHA" ]]; then
+            echo "$DEPLOY_SHA is already live."
+            exit 0
+          fi
+          deploy/blue-green.sh stage "$DEPLOY_SHA"
+          live=$(deploy/web.sh live)
+          idle=blue
+          [[ "$live" != blue ]] || idle=green
+          echo "colour=$idle" >> "$GITHUB_OUTPUT"
+          echo "sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
+          printf '### App traffic approval\n\nSmoke-tested `%s` on `%s`.\n' "$DEPLOY_SHA" "$idle" >> "$GITHUB_STEP_SUMMARY"
+
+  switch:
+    needs: stage
+    if: >-
+      needs.stage.outputs.colour != '' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main'
+    environment: app-production
+    runs-on: [self-hosted, lab-app]
+    concurrency:
+      group: deploy-app
+      cancel-in-progress: false
+    timeout-minutes: 5
+    env:
+      DEPLOY_SHA: ${{ needs.stage.outputs.sha }}
+      COLOUR: ${{ needs.stage.outputs.colour }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+      - name: Switch app traffic to the approved build
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fsS --retry 10 --retry-all-errors --retry-delay 2 --max-time 5 http://127.0.0.1/version \
-            | jq -e --arg sha "$DEPLOY_SHA" '.git_sha == $sha and .image_tag == $sha'
-          curl -fsS --max-time 5 http://127.0.0.1/predict -H 'Content-Type: application/json' \
-            -d '{"pickup_zone_id":132,"dropoff_zone_id":230,"pickup_datetime":"2024-03-08T17:05:00"}' \
-            | jq -e '.duration_minutes == 12.25 and .model.name == "static-median"'
-          status=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
-            http://127.0.0.1/predict -H 'Content-Type: application/json' \
-            -d '{"pickup_zone_id":999,"dropoff_zone_id":230,"pickup_datetime":"2024-03-08T17:05:00"}')
-          [[ "$status" == 422 ]]
+          head_sha=$(curl -fsS --max-time 15 -H @- "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/ref/heads/main" \
+            <<< "Authorization: Bearer $GH_TOKEN" | jq -er .object.sha)
+          if [[ "$head_sha" != "$DEPLOY_SHA" ]]; then
+            echo "main advanced while this build waited for approval. Review the newer deploy." >&2
+            exit 1
+          fi
+          deploy/blue-green.sh switch "$COLOUR" "$DEPLOY_SHA" | tee -a "$GITHUB_STEP_SUMMARY"

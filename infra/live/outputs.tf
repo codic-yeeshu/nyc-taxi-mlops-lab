@@ -10,6 +10,10 @@ output "platform_instance_id" {
   value = module.host["platform"].instance_id
 }
 
+output "platform_private_ip" {
+  value = module.host["platform"].private_ip
+}
+
 output "llm_instance_id" {
   value = module.host["llm"].instance_id
 }

@@ -1,0 +1,34 @@
+name: Roll back app
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full commit SHA already running on the idle colour
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    if: github.ref == 'refs/heads/main' && vars.LAB_SERVING == 'on'
+    environment: app-production
+    runs-on: [self-hosted, lab-app]
+    concurrency:
+      group: deploy-app
+      cancel-in-progress: false
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Switch to the approved idle build and measure recovery
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          idle=blue
+          [[ "$(deploy/web.sh live)" != blue ]] || idle=green
+          deploy/blue-green.sh switch "$idle" "$TARGET_SHA" | tee -a "$GITHUB_STEP_SUMMARY"

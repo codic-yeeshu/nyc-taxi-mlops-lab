@@ -72,7 +72,7 @@ jobs:
           [[ "$live" != blue ]] || idle=green
           echo "colour=$idle" >> "$GITHUB_OUTPUT"
           echo "sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
-          printf '### App traffic approval\n\nSmoke-tested `%s` on `%s`.\n' "$DEPLOY_SHA" "$idle" >> "$GITHUB_STEP_SUMMARY"
+          printf '### App traffic approval\n\nSmoke-tested **%s** on **%s**.\n' "$DEPLOY_SHA" "$idle" >> "$GITHUB_STEP_SUMMARY"
 
   switch:
     needs: stage

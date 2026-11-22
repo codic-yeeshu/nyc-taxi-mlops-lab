@@ -38,7 +38,7 @@ jobs:
           echo "target=$target" >> "$GITHUB_OUTPUT"
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
           {
-            printf '### Model promotion approval\n\nVersion `%s` would replace `%s`.\n\n' "$target" "${previous:-no champion}"
+            printf '### Model promotion approval\n\nVersion **%s** would replace **%s**.\n\n' "$target" "${previous:-no champion}"
             jq -r '.metrics | to_entries[] | "- \(.key): \(.value)"' <<<"$plan"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -79,11 +79,11 @@ jobs:
             return 1
           }
 
-          printf 'Outgoing champion: `%s`\n\n' "${PREVIOUS:-none}" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Outgoing champion **%s**\n\n' "${PREVIOUS:-none}" >> "$GITHUB_STEP_SUMMARY"
           registry promote
           if deploy/web.sh reload champion | jq -e --arg target "$TARGET" '.alias == "champion" and .version == $target' &&
              check_prediction "$TARGET"; then
-            printf 'Verified champion `%s` through the rider-facing app.\n' "$TARGET" >> "$GITHUB_STEP_SUMMARY"
+            printf 'Verified champion **%s** through the rider-facing app.\n' "$TARGET" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

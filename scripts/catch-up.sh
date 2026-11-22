@@ -73,8 +73,9 @@ after_s3() {
 }
 
 after_s4() {
-  echo "== S4: restore after a session end (the platform workflow already deployed the wake service)"
-  "$root/scripts/restore.sh"
+  echo "== S4: inspect recovery state after a session end"
+  "$root/scripts/restore.sh" --plan
+  echo "Run scripts/restore.sh --apply when ready to start or resume any stopped resources."
 }
 
 after_s5() {
